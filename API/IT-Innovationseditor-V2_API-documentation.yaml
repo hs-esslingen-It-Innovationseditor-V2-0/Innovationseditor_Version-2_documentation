@@ -1,0 +1,1267 @@
+openapi: 3.0.3
+info:
+  title: IT-Innovationseditor V2.0 API
+  description: |
+    API for the IT-Innovationseditor V2.0 - A system for creating, managing, and publishing 
+    short articles of thesis works for the IT-Innovations journal series at 
+    Hochschule Esslingen (HSE).
+    
+    The system supports four main roles:
+    - Students: Create and edit their thesis articles
+    - Professors: Review assigned articles
+    - Administrators: Manage users, permissions, and editing periods
+    - Dean: Manage preambles and overview all submissions
+  version: 1.0.0
+  contact:
+    name: Hochschule Esslingen - Fakultät Informatik
+    
+servers:
+  - url: https://api.it-innovationen.hs-esslingen.de
+    description: Production server
+  - url: https://api-staging.it-innovationen.hs-esslingen.de
+    description: Staging server
+
+tags:
+  - name: Articles
+    description: Thesis Article management
+  - name: Users
+    description: User management (Keycloak?) (Admin only)
+  - name: Editing Periods
+    description: Editing period management (Admin only)
+  - name: Images
+    description: Image upload and management
+  - name: Sources
+    description: Bibliography and source management
+  - name: Preview
+    description: PDF preview generation
+  - name: Preamble
+    description: Journal preamble management (Dean only)
+
+security:
+  - BearerAuth: []
+  - HSEAuth: []
+
+paths:
+  /articles:
+    get:
+      tags:
+        - articles
+      summary: List articles
+      description: |
+        Returns articles based on user role:
+        - Students: Their own articles
+        - Professors: Assigned articles
+        - Administrators/Dean: All articles
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ArticleStatus'
+      responses:
+        '200':
+          description: List of articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ArticleResponseDTO'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    post:
+      tags:
+        - articles
+      summary: Create a new Article
+      description: Students create a new thesis Article
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleCreateRequestDTO'
+      responses:
+        '201':
+          description: Article created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /articles/{ArticleId}:
+    get:
+      tags:
+        - articles
+      summary: Get Article by ID
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      responses:
+        '200':
+          description: Article details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    put:
+      tags:
+        - articles
+      summary: Update Article
+      description: Update Article content and metadata
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleRequestDTO'
+      responses:
+        '200':
+          description: Article updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    delete:
+      tags:
+        - articles
+      summary: Delete Article
+      description: Admin can delete any Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      responses:
+        '200':
+          description: Article deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /articles/{ArticleId}/versions:
+    get:
+      tags:
+        - articles
+      summary: Get Article versions
+      description: Retrieve version history (1st submission, revisions, final)
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      responses:
+        '200':
+          description: List of Article versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArticleVersionResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+    post:
+      tags:
+        - articles
+      summary: Create new Article version
+      description: Submit a new version of the Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleVersionCreateRequestDTO'
+      responses:
+        '201':
+          description: Article version created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleVersionResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /articles/{ArticleId}/preview:
+    get:
+      tags:
+        - Preview
+      summary: Generate PDF preview
+      description: Generate and return PDF preview of the Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      responses:
+        '200':
+          description: PDF preview
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /articles/{ArticleId}/images:
+    get:
+      tags:
+        - Images
+      summary: List images for Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      responses:
+        '200':
+          description: List of images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImageResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+    post:
+      tags:
+        - Images
+      summary: Upload image for Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageCreateRequestDTO'
+      responses:
+        '201':
+          description: Image uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /articles/{ArticleId}/images/{imageId}:
+    get:
+      tags:
+        - Images
+      summary: Get image
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Image recieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags:
+        - Images
+      summary: Change attribute of an image
+      description: Student changes their images description
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageRequestDTO'
+      responses:
+        '200':
+          description: Article assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+
+    delete:
+      tags:
+        - Images
+      summary: Delete image
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Image deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /articles/{ArticleId}/sources:
+    get:
+      tags:
+        - Sources
+      summary: List sources for Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      responses:
+        '200':
+          description: List of sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+    
+    post:
+      tags:
+        - Sources
+      summary: Add source to Article
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceCreateRequestDTO'
+      responses:
+        '201':
+          description: Source added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /articles/{ArticleId}/sources/{sourceId}:
+    put:
+      tags:
+        - Sources
+      summary: Update source
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceCreateRequestDTO'
+      responses:
+        '200':
+          description: Source updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceResponseDTO'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    delete:
+      tags:
+        - Sources
+      summary: Delete source
+      parameters:
+        - $ref: '#/components/parameters/ArticleIdParam'
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Article deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List users (Admin only)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserRole'
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserResponseDTO'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    post:
+      tags:
+        - Users
+      summary: Create user (Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequestDTO'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponseDTO'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    put:
+      tags:
+        - Users
+      summary: Update user (Admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequestDTO'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    delete:
+      tags:
+        - Users
+      summary: Delete user (Admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Article deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /editing-periods:
+    get:
+      tags:
+        - Editing Periods
+      summary: List editing periods
+      responses:
+        '200':
+          description: List of editing periods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EditingPeriodResponseDTO'
+    
+    post:
+      tags:
+        - Editing Periods
+      summary: Create editing period (Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditingPeriodCreateRequestDTO'
+      responses:
+        '201':
+          description: Editing period created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditingPeriodResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /editing-periods/{periodId}:
+    put:
+      tags:
+        - Editing Periods
+      summary: Update editing period (Admin only)
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditingPeriodRequestDTO'
+      responses:
+        '200':
+          description: Editing period updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditingPeriodResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /editing-periods/users/{userId}:
+    post:
+      tags:
+        - Editing Periods
+      summary: Set individual editing period (Admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      description: Set or extend editing period for a specific user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditingPeriodCreateRequestDTO'
+      responses:
+        '201':
+          description: Individual period set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditingPeriodResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /editing-periods/{periodId}/preamble:
+    get:
+      tags:
+        - Preamble
+      summary: Get current preamble
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Current preamble
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreambleResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    put:
+      tags:
+        - Preamble
+      summary: Update preamble (Dean only)
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: object
+                  $ref: '#/components/schemas/PreambleRequestDTO'
+      responses:
+        '200':
+          description: Preamble updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreambleResponseDTO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /editing-periods/{periodId}/preamble/preview:
+    get:
+      tags:
+        - Preamble
+      summary: Get preamble preview (Dean only)
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema:
+            type: integer
+      description: Generate formatted PDF preview of the preamble
+      responses:
+        '200':
+          description: Preamble PDF preview
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /editing-periods/{periodId}/book:
+    get:
+      tags:
+        - Preview
+      summary: Generate combined PDF (Dean and Admin)
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: query
+          schema:
+            type: integer
+      description: Generate PDF with preamble and all articles combined
+      responses:
+        '200':
+          description: Combined PDF of preamble and all articles
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    HSEAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.hs-esslingen.de/oauth/authorize
+          tokenUrl: https://auth.hs-esslingen.de/oauth/token
+          scopes:
+            read: Read access
+            write: Write access
+
+  parameters:
+    ArticleIdParam:
+      name: ArticleId
+      in: path
+      required: true
+      schema:
+        type: integer
+    VersionIdParam:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: integer
+        description: Specific version ID to preview (latest if omitted)
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    UserRole:
+      type: string
+      enum:
+        - student
+        - professor
+        - administrator
+        - dean
+
+    ArticleStatus:
+      type: string
+      enum:
+        - draft
+        - submitted
+        - reiewed
+        - published
+
+    UserCreateRequestDTO:
+      type: object
+      required:
+        - firstname
+        - lastname
+        - password
+        - email
+      properties:
+        firstname:
+          type: string
+        lastname:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    UserRequestDTO:
+      type: object
+      properties:
+        fullname:
+          type: string
+
+    UserResponseDTO:
+      type: object
+      properties:
+        userId:
+          type: integer
+        fullname:
+          type: string
+
+    Article:
+      type: object
+      properties:
+        ArticleId:
+          type: integer
+        author:
+          type: integer
+        period:
+          type: object
+          $ref: '#/components/schemas/EditingPeriod'
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/ArticleStatus'
+        assigned_reviewer:
+          type: array
+          items:
+            type: integer
+          nullable: true
+        location:
+          type: string
+        confidential_flag:
+          type: boolean
+          nullable: false
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ArticleCreateRequestDTO:
+      type: object
+      required:
+        - author
+        - period
+        - title
+      properties:
+        author:
+          type: integer
+        period:
+          type: integer
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+        status:
+          $ref: '#/components/schemas/ArticleStatus'
+          default: draft
+        assigned_reviewer:
+          type: integer
+        confidential_flag:
+          type: boolean
+          default: false
+
+    ArticleRequestDTO:
+      type: object
+      properties:
+        period:
+          type: integer
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+        status:
+          $ref: '#/components/schemas/ArticleStatus'
+        assigned_reviewer:
+          type: integer
+        confidential_flag:
+          type: boolean
+
+    ArticleResponseDTO:
+      type: object
+      properties:
+        ArticleId:
+          type: integer
+        author:
+          type: integer
+        period:
+          type: object
+          $ref: '#/components/schemas/EditingPeriodResponseDTO'
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/ArticleStatus'
+        assigned_reviewer:
+          type: array
+          items:
+            type: integer
+          nullable: true
+        confidential_flag:
+          type: boolean
+          nullable: false
+        updated_at:
+          type: string
+          format: date-time
+
+    ArticleVersion:
+      type: object
+      properties:
+        versionId:
+          type: integer
+        ArticleId:
+          type: object
+          $ref: '#/components/schemas/Article'
+        content:
+          type: string
+          format: JSON
+        comment:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ArticleVersionCreateRequestDTO:
+      type: object
+      required:
+        - ArticleId
+        - content
+      properties:
+        ArticleId:
+          type: integer
+        content:
+          type: string
+          format: JSON
+        comment:
+          type: string
+
+    ArticleVersionResponseDTO:
+      type: object
+      required:
+        - versionId
+        - ArticleId
+        - comment
+      properties:
+        versionId:
+          type: integer
+        ArticleId:
+          type: integer
+        comment:
+          type: string
+
+    Source:
+      type: object
+      properties:
+        sourceId:
+          type: integer
+        ArticleId:
+          type: object
+          $ref: '#/components/schemas/Article'
+        citation_key:
+          type: string
+        full_citation:
+          type: string
+          format: JSON
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SourceCreateRequestDTO:
+      type: object
+      required:
+        - ArticleId
+        - citation_key
+        - full_citation
+      properties:
+        ArticleId:
+          type: integer
+        citation_key:
+          type: string
+        full_citation:
+          type: string
+          format: JSON
+
+    SourceRequestDTO:
+      type: object
+      required:
+        - citation_key
+        - full_citation
+      properties:
+        citation_key:
+          type: string
+        full_citation:
+          type: string
+          format: JSON
+
+    SourceResponseDTO:
+      type: object
+      properties:
+        sourceId:
+          type: integer
+        ArticleId:
+          type: integer
+        citation_key:
+          type: string
+        full_citation:
+          type: string
+          format: JSON
+        updated_at:
+          type: string
+          format: date-time
+
+    Image:
+      type: object
+      properties:
+        imageId:
+          type: integer
+        sourceId:
+          type: object
+          $ref: '#/components/schemas/Source'
+          nullable: true
+        ArticleId:
+          type: object
+          $ref: '#/components/schemas/Article'
+        filename:
+          type: string
+        filepath:
+          type: string
+          format: uri
+        mime_type:
+          type: string
+        caption:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ImageCreateRequestDTO:
+      type: object
+      required:
+        - ArticleId
+        - filename
+        - mime_type
+      properties:
+        sourceId:
+          type: integer
+          nullable: true
+        ArticleId:
+          type: integer
+        filename:
+          type: string
+        mime_type:
+          type: string
+        caption:
+          type: string
+
+    ImageRequestDTO:
+      type: object
+      properties:
+        sourceId:
+          type: integer
+        filename:
+          type: string
+        caption:
+          type: string
+
+    ImageResponseDTO:
+      type: object
+      properties:
+        imageId:
+          type: integer
+        sourceId:
+          type: integer
+        filename:
+          type: string
+        mime_type:
+          type: string
+        caption:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+
+    EditingPeriod:
+      type: object
+      properties:
+        periodId:
+          type: integer
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EditingPeriodCreateRequestDTO:
+      type: object
+      required:
+        - name
+        - start_date
+        - end_date
+      properties:
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+
+    EditingPeriodRequestDTO:
+      type: object
+      properties:
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+
+    EditingPeriodResponseDTO:
+      type: object
+      properties:
+        periodId:
+          type: integer
+        name:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Preamble:
+      type: object
+      properties:
+        id:
+          type: integer
+        author:
+          type: integer
+        period:
+          type: integer
+        content:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+
+  responses:
+    BadRequestError:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "BAD_REQUEST"
+              message: "Invalid input data"
+              details: []
+
+    UnauthorizedError:
+      description: Unauthorized - Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Authentication required"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Resource not found"
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "INTERNAL SERVER ERROR"
+              message: "The server is unable to respond request."

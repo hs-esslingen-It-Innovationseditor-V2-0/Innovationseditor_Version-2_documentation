@@ -1,0 +1,90 @@
+enum article_status {
+	DRAFT
+	SUBMITTED
+	REVIEWED
+	PUBLISHED
+}
+
+Table users [headercolor: #175e7a] {
+	user_id integer [ pk, increment, not null, unique ]
+	keycloak_id uuid [ not null, unique ]
+	full_name varchar(255) [ not null ]
+	created_at timestamp [ not null ]
+}
+
+Table articles [headercolor: #175e7a] {
+	article_id integer [ pk, increment, not null, unique ]
+	user_id integer [ not null ]
+	submission_period_id integer [ not null ]
+	title varchar(500) [ not null ]
+	status article_status [ not null ]
+	reviewer_id integer [ not null ]
+	location varchar(255) [ not null ]
+	is_confidential boolean [ not null ]
+	created_at timestamp [ not null ]
+	updated_at timestamp [ not null ]
+}
+
+Table article_versions [headercolor: #175e7a] {
+	article_version_id integer [ pk, increment, not null, unique ]
+	article_id integer [ not null ]
+	content_markdown text [ not null ]
+	comment varchar(255)
+	created_at timestamp [ not null ]
+}
+
+Table images [headercolor: #175e7a] {
+	image_id integer [ pk, increment, not null, unique ]
+	uuid uuid [ not null ]
+	source_id integer [ not null ]
+	article_id integer [ not null ]
+	filename varchar(255) [ not null ]
+	filepath varchar(1024) [ not null ]
+	mime_type varchar(100) [ not null ]
+	caption varchar(500)
+	created_at timestamp [ not null ]
+}
+
+Table sources [headercolor: #175e7a] {
+	source_id integer [ pk, increment, not null, unique ]
+	article_id integer [ not null ]
+	citation_key varchar(100) [ not null ]
+	full_citation json [ not null ]
+	created_at timestamp [ not null ]
+}
+
+Table submission_periods [headercolor: #175e7a] {
+	submission_period_id integer [ pk, increment, not null, unique ]
+	name varchar(255) [ not null ]
+	start_date timestamp [ not null ]
+	end_date timestamp [ not null ]
+	created_at timestamp [ not null ]
+}
+
+Ref "" {
+	users.user_id < articles.user_id [ delete: no action, update: no action ]
+}
+
+Ref "" {
+	users.user_id < articles.reviewer_id [ delete: no action, update: no action ]
+}
+
+Ref "" {
+	articles.article_id < article_versions.article_id [ delete: no action, update: no action ]
+}
+
+Ref "" {
+	articles.article_id < images.article_id [ delete: no action, update: no action ]
+}
+
+Ref "" {
+	sources.source_id < images.source_id [ delete: no action, update: no action ]
+}
+
+Ref "" {
+	articles.article_id < sources.article_id [ delete: no action, update: no action ]
+}
+
+Ref "" {
+	articles.submission_period_id > submission_periods.submission_period_id [ delete: no action, update: no action ]
+}
